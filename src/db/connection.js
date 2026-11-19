@@ -207,7 +207,29 @@ export function initDb() {
   ensureColumn('dry_run_positions', 'token_amount_raw', 'TEXT');
   ensureColumn('dry_run_positions', 'strategy_id', "TEXT DEFAULT 'sniper'");
   ensureColumn('dry_run_positions', 'partial_tp_done', 'INTEGER DEFAULT 0');
+  ensureColumn('dry_run_positions', 'pending_at_ms', 'INTEGER');
+  ensureColumn('dry_run_positions', 'entry_fee_lamports', 'INTEGER');
+  ensureColumn('dry_run_positions', 'realized_sol', 'REAL DEFAULT 0');
+  ensureColumn('dry_run_positions', 'missing_data_cycles', 'INTEGER DEFAULT 0');
+  ensureColumn('dry_run_positions', 'last_checked_at_ms', 'INTEGER');
+  ensureColumn('dry_run_positions', 'close_attempts', 'INTEGER DEFAULT 0');
+  ensureColumn('trade_intents', 'signature', 'TEXT');
+  ensureColumn('trade_intents', 'error', 'TEXT');
+  ensureColumn('trade_intents', 'claimed_at_ms', 'INTEGER');
   ensureColumn('decision_logs', 'strategy_id', 'TEXT');
+
+  // One live position per mint, enforced by SQLite instead of a check-then-insert
+  // race. Older databases may already hold duplicates, so failure is logged and
+  // the application-level guard still applies.
+  try {
+    db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_positions_one_open_per_mint
+      ON dry_run_positions(mint)
+      WHERE status IN ('open', 'pending_open')
+    `);
+  } catch (err) {
+    console.log(`[db] one-open-position index skipped: ${err.message}`);
+  }
 
   const defaults = {
     agent_enabled: 'true',

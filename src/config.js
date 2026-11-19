@@ -26,6 +26,18 @@ export const SOLANA_WS_URL = process.env.SOLANA_WS_URL || `wss://mainnet.helius-
 export const JUPITER_SWAP_BASE_URL = process.env.JUPITER_SWAP_BASE_URL || 'https://api.jup.ag/swap/v2';
 export const JUPITER_SLIPPAGE_BPS = Number(process.env.JUPITER_SLIPPAGE_BPS || 300);
 export const LIVE_MIN_SOL_RESERVE_LAMPORTS = Math.floor(Number(process.env.LIVE_MIN_SOL_RESERVE || 0.02) * 1_000_000_000);
+// Rent-exempt minimum for a fresh associated token account.
+export const ATA_RENT_LAMPORTS = 2_039_280;
+// Priority fee plus Jupiter platform-fee headroom for a single swap.
+export const ENTRY_FEE_BUFFER_LAMPORTS = 3_000_000;
+
+/**
+ * A buy needs more than the position size: ATA rent, swap fee, and the reserve
+ * that must survive so the eventual sell is still affordable.
+ */
+export function minimumEntryLamports(amountLamports) {
+  return Number(amountLamports) + LIVE_MIN_SOL_RESERVE_LAMPORTS + ATA_RENT_LAMPORTS + ENTRY_FEE_BUFFER_LAMPORTS;
+}
 export const LLM_BASE_URL = process.env.LLM_BASE_URL || 'https://api.minimax.io/v1';
 export const LLM_API_KEY = process.env.LLM_API_KEY || '';
 export const LLM_MODEL = process.env.LLM_MODEL || 'MiniMax-M2.7';

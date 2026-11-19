@@ -5,7 +5,7 @@ import { storeDecision, storeBatchDecision, logDecisionEvent } from '../db/decis
 import { buildCandidate, filterCandidate, signalLabel } from './candidateBuilder.js';
 import { decideCandidateBatch } from './llm.js';
 import { activeStrategy } from '../db/settings.js';
-import { createDryRunPosition, createLivePosition, canOpenMorePositions, openPositionCount, tradingMode } from '../db/positions.js';
+import { createDryRunPosition, canOpenMorePositions, openPositionCount, tradingMode } from '../db/positions.js';
 import { sendBatchReveal, sendTelegram, sendPositionOpen, sendTradeIntent } from '../telegram/send.js';
 import { candidateSummary } from '../telegram/format.js';
 import { createTradeIntent } from '../db/intents.js';
@@ -187,7 +187,24 @@ export async function handleApprovedBuy(selectedRow, decision, batchId, rows = [
   try {
     await executeLiveBuy(freshSelectedRow, decision, batchId, executionRows, triggerCandidateId);
   } catch (err) {
-    const intentId = createTradeIntent(freshSelectedRow.id, freshSelectedRow.candidate, decision, mode, 'execution_failed');
+    if (err.code === 'DUPLICATE_POSITION') {
+      logDecisionEvent({
+        batchId,
+        triggerCandidateId,
+        selectedRow: freshSelectedRow,
+        rows: executionRows,
+        decision,
+        mode,
+        action: 'live_entry_skipped_duplicate',
+        guardrails: { openPositions: openPositionCount() },
+        execution: { error: err.message },
+      });
+      return;
+    }
+    // A signed transaction whose execute call never answered is not a failure:
+    // it may have landed, so it must not be reported as a plain failure.
+    const unknown = err.phase === 'execute';
+    const intentId = createTradeIntent(freshSelectedRow.id, freshSelectedRow.candidate, decision, mode, unknown ? 'execution_unknown' : 'execution_failed');
     logDecisionEvent({
       batchId,
       triggerCandidateId,
@@ -195,18 +212,19 @@ export async function handleApprovedBuy(selectedRow, decision, batchId, rows = [
       rows: executionRows,
       decision,
       mode,
-      action: 'live_entry_failed',
+      action: unknown ? 'live_entry_unknown' : 'live_entry_failed',
       guardrails: { maxOpenPositions: numSetting('max_open_positions', 3), openPositions: openPositionCount() },
       execution: { intentId, error: err.message },
     });
     await sendTelegram([
-      '🛑 <b>Live trade failed</b>',
+      unknown ? '🛑 <b>Live trade state unknown</b>' : '🛑 <b>Live trade failed</b>',
       '',
       candidateSummary(freshSelectedRow.candidate, decision),
       '',
       `Intent #${intentId} stored.`,
       `Error: ${escapeHtml(err.message)}`,
-    ].join('\n'));
+      unknown ? 'The transaction was signed. Verify the wallet before retrying.' : null,
+    ].filter(Boolean).join('\n'));
   }
 }
 

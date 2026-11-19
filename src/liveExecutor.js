@@ -3,7 +3,6 @@ import bs58 from 'bs58';
 import { Connection, Keypair, PublicKey, VersionedTransaction } from '@solana/web3.js';
 import {
   JUPITER_API_KEY,
-  JUPITER_SLIPPAGE_BPS,
   JUPITER_SWAP_BASE_URL,
   JSON_HEADERS,
   SOLANA_PRIVATE_KEY,
@@ -16,8 +15,13 @@ let solanaConnection = null;
 function parseKeypair(secret) {
   const value = String(secret || '').trim();
   if (!value) return null;
-  if (value.startsWith('[')) return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(value)));
-  return Keypair.fromSecretKey(bs58.decode(value));
+  const bytes = value.startsWith('[')
+    ? Uint8Array.from(JSON.parse(value))
+    : bs58.decode(value);
+  if (bytes.length !== 64) {
+    throw new Error(`SOLANA_PRIVATE_KEY must decode to 64 bytes, got ${bytes.length}.`);
+  }
+  return Keypair.fromSecretKey(bytes);
 }
 
 export function initLiveExecution() {
@@ -96,11 +100,59 @@ async function jupiterExecute(order, signedTransaction) {
     signedTransaction,
     requestId: order.requestId,
   };
-  const res = await axios.post(`${JUPITER_SWAP_BASE_URL.replace(/\/$/, '')}/execute`, body, {
-    timeout: 30_000,
-    headers: { ...JSON_HEADERS, 'content-type': 'application/json', 'x-api-key': JUPITER_API_KEY },
-  });
-  return res.data;
+  try {
+    const res = await axios.post(`${JUPITER_SWAP_BASE_URL.replace(/\/$/, '')}/execute`, body, {
+      timeout: 30_000,
+      headers: { ...JSON_HEADERS, 'content-type': 'application/json', 'x-api-key': JUPITER_API_KEY },
+    });
+    return res.data;
+  } catch (err) {
+    // The transaction is already signed at this point, so a timeout or 5xx does
+    // not prove the swap failed. Tag it so callers can mark state unknown.
+    err.phase = 'execute';
+    throw err;
+  }
+}
+
+/**
+ * Reads the landed transaction instead of trusting Jupiter's estimate:
+ * actual token delta, actual fee, and the owner's net SOL change.
+ */
+export async function confirmSwapFill(signature, { mint, owner } = {}) {
+  if (!solanaConnection || !signature) return null;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    let tx = null;
+    try {
+      tx = await solanaConnection.getTransaction(signature, {
+        commitment: 'confirmed',
+        maxSupportedTransactionVersion: 0,
+      });
+    } catch (err) {
+      console.log(`[live] fill lookup ${String(signature).slice(0, 8)}... ${err.message}`);
+    }
+    if (tx) {
+      const meta = tx.meta || {};
+      const keys = tx.transaction?.message?.staticAccountKeys?.map(key => key.toBase58()) || [];
+      const ownerIndex = owner ? keys.indexOf(owner) : -1;
+      const preSol = ownerIndex >= 0 ? Number(meta.preBalances?.[ownerIndex] || 0) : null;
+      const postSol = ownerIndex >= 0 ? Number(meta.postBalances?.[ownerIndex] || 0) : null;
+      const findBalance = list => (list || []).find(entry => entry.mint === mint && (!owner || entry.owner === owner));
+      const preToken = findBalance(meta.preTokenBalances);
+      const postToken = findBalance(meta.postTokenBalances);
+      const tokenDelta = postToken
+        ? Number(postToken.uiTokenAmount?.amount || 0) - Number(preToken?.uiTokenAmount?.amount || 0)
+        : null;
+      return {
+        confirmed: true,
+        slot: tx.slot,
+        tokenAmountRaw: tokenDelta > 0 ? String(tokenDelta) : null,
+        feeLamports: Number(meta.fee || 0) || null,
+        solDeltaLamports: preSol != null && postSol != null ? postSol - preSol : null,
+      };
+    }
+    await new Promise(resolve => setTimeout(resolve, 1_500));
+  }
+  return { confirmed: false, tokenAmountRaw: null, feeLamports: null, solDeltaLamports: null };
 }
 
 export async function executeJupiterSwap({ inputMint, outputMint, amount }) {
