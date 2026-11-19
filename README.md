@@ -15,6 +15,21 @@ This Codebase is on testing-period, developer doesn't guarantee of any result.
 5. Charon routes approved buys through `dry_run`, `confirm`, or `live`.
 6. Open positions are monitored every `POSITION_CHECK_MS` for TP, SL, trailing TP, max hold, and partial TP rules.
 
+## Safety guards
+
+Charon moves money, so these are enforced in code, not in documentation:
+
+- **Authorized ingress.** Messages and callbacks outside `TELEGRAM_CHAT_ID` (and outside `OPERATOR_USER_IDS` when set) are dropped before any handler runs.
+- **Armed mode switch.** `confirm` and `live` cannot be enabled by a single tap or by `/setfilter`; the switch needs a second confirmation bound to the same chat and user, expiring in 60 seconds. Returning to `dry_run` is immediate.
+- **Reserve before swap.** The position row is written as `pending_open` before a transaction is signed, and a unique partial index makes a duplicate mint impossible. A duplicate costs nothing. A confirmed intent is claimed with a conditional `UPDATE`, so a double tap cannot swap twice.
+- **Chain truth.** After a swap the landed transaction is read back for the real token delta, real fee and real SOL spent. Stored size and PnL come from that, not from Jupiter's estimate.
+- **Exit cannot be skipped.** When market data disappears (the shape of a rug), the position is not silently ignored: after `MISSING_DATA_EXIT_CYCLES` (default 3) Charon forces an exit attempt. A failed sell never marks a position closed.
+- **Token safety.** A mint with an active mint authority, a freeze authority, or Token-2022 extensions is refused before signing.
+- **Bounded control surface.** Every number reachable from Telegram has per-key type, sign and range validation, with the position size additionally capped by `LIVE_MAX_POSITION_SOL`.
+- **Bounded disk.** `DB_RETENTION_DAYS` (default 30) prunes decision logs, signal events and unreferenced candidates every six hours.
+
+Run the suite with `npm test`. `npm run check` only covers syntax.
+
 ## Access
 
 Charon requires a signal server URL and API key. The signal server aggregates fee-claim, graduated, and trending data from Pump.fun in real time — without it Charon has nothing to screen.
@@ -55,7 +70,13 @@ TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 ```
 
-`TELEGRAM_CHAT_ID` is the chat or group ID where Charon sends alerts and accepts commands. Only messages from this chat are processed.
+`TELEGRAM_CHAT_ID` is the chat or group ID where Charon sends alerts and accepts commands. Every message and button press is checked against it; anything from another chat is ignored and logged. For a second factor inside that chat:
+
+```env
+OPERATOR_USER_IDS=
+```
+
+A comma-separated list of Telegram user ids allowed to command the bot. Leave it empty to let any member of `TELEGRAM_CHAT_ID` drive it.
 
 Signal server (required — see [Access](#access) above):
 

@@ -18,7 +18,7 @@ export function pruneOldRows({ retentionDays = Number(process.env.DB_RETENTION_D
       result[label] = `skipped: ${err.message}`;
     }
   };
-  run('decision_logs', 'DELETE FROM decision_logs WHERE created_at_ms < ?', [cutoff]);
+  run('decision_logs', 'DELETE FROM decision_logs WHERE at_ms < ?', [cutoff]);
   run('signal_events', 'DELETE FROM signal_events WHERE at_ms < ?', [cutoff]);
   run('learning_runs', 'DELETE FROM learning_runs WHERE created_at_ms < ?', [cutoff]);
   run('candidates', `

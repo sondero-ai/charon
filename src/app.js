@@ -10,9 +10,12 @@ import { makeFailureTracker } from './utils.js';
 import { pruneOldRows } from './db/maintenance.js';
 
 setDefaultResultOrder('ipv4first');
-validateConfig();
 
 export async function startCharon() {
+  // Validated inside the function so a bad config surfaces through the caller's
+  // error path (log + Telegram alert + non-zero exit) instead of a bare throw
+  // during module evaluation, where no handler can catch it.
+  validateConfig();
   initDb();
   initLiveExecution();
   setupTelegram();
