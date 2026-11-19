@@ -30,6 +30,7 @@ import { consumeNumericFilterInput } from './input.js';
 import { runLearning, sendLessons } from '../learning/commands.js';
 import { fetchWalletPnl } from '../enrichment/wallets.js';
 import { isAuthorizedChat, isAuthorizedUser, rejectUnauthorized } from './auth.js';
+import { validateStrategySetting, normalizeNumericSetting, numericRule } from '../strategySchema.js';
 
 export async function handleMessage(msg) {
   const text = (msg.text || '').trim();
@@ -66,20 +67,16 @@ export async function handleMessage(msg) {
     }
     const strat = strategyById(id);
     if (!strat) return bot.sendMessage(chatId, `Strategy "${id}" not found.`);
-    const numKeys = new Set(['tp_percent', 'sl_percent', 'position_size_sol', 'max_open_positions', 'min_mcap_usd', 'max_mcap_usd', 'min_holders', 'max_top20_holder_percent', 'trailing_percent', 'partial_tp_at_percent', 'partial_tp_sell_percent', 'max_hold_ms', 'llm_min_confidence', 'min_source_count', 'min_fee_claim_sol', 'min_gmgn_total_fee_sol', 'max_ath_distance_pct', 'token_age_max_ms', 'trending_min_volume_usd', 'trending_min_swaps', 'trending_max_rug_ratio', 'trending_max_bundler_rate', 'min_saved_wallet_holders', 'min_graduated_volume_usd']);
-    const boolKeys = new Set(['trailing_enabled', 'partial_tp', 'use_llm', 'require_fee_claim']);
+    const parsed = validateStrategySetting(key, value);
+    if (!parsed.ok) {
+      return bot.sendMessage(chatId, `Rejected: ${parsed.error}`);
+    }
     const newConfig = { ...strat };
     delete newConfig.id;
     delete newConfig.name;
-    if (numKeys.has(key)) {
-      newConfig[key] = Number(value);
-    } else if (boolKeys.has(key)) {
-      newConfig[key] = value === 'true' || value === '1' || value === 'yes';
-    } else {
-      newConfig[key] = value;
-    }
+    newConfig[key] = parsed.value;
     updateStrategyConfig(id, newConfig);
-    return bot.sendMessage(chatId, `Updated ${id}.${key} = ${value}\n\n${strategyMenuText()}`, { parse_mode: 'HTML' });
+    return bot.sendMessage(chatId, `Updated ${id}.${key} = ${parsed.value}\n\n${strategyMenuText()}`, { parse_mode: 'HTML' });
   }
   if (text.startsWith('/pnl')) return sendPnl(chatId);
   if (text.startsWith('/learn')) {
@@ -131,7 +128,7 @@ export async function handleMessage(msg) {
       'trending_max_rug_ratio',
       'trending_max_bundler_rate',
       'trading_mode',
-      'llm_min_confidence',
+      // llm_min_confidence lives on the strategy: /stratset or the Agent menu.
       'llm_candidate_pick_count',
       'llm_candidate_max_age_ms',
       'max_open_positions',
@@ -147,7 +144,14 @@ export async function handleMessage(msg) {
     if (key === 'trading_mode' && value !== 'dry_run') {
       return bot.sendMessage(chatId, 'confirm/live requires the armed confirmation: /menu → Agent → mode button, then tap confirm.');
     }
-    setSetting(key, value === 'off' ? '0' : value);
+    const rule = numericRule(key);
+    if (rule) {
+      const parsed = normalizeNumericSetting(key, value);
+      if (!parsed.ok) return bot.sendMessage(chatId, `Rejected: ${parsed.error}`);
+      setSetting(key, String(parsed.value));
+    } else {
+      setSetting(key, value === 'off' ? '0' : value);
+    }
     return bot.sendMessage(chatId, filtersText(), { parse_mode: 'HTML' });
   }
 }

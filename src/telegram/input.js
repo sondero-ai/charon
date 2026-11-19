@@ -1,6 +1,7 @@
 import { bot } from './bot.js';
 import { TELEGRAM_CHAT_ID } from '../config.js';
 import { now, parseNumericInput } from '../utils.js';
+import { validateStrategySetting, normalizeNumericSetting, numericRule } from '../strategySchema.js';
 import { activeStrategy, setSetting, updateStrategyConfig } from '../db/settings.js';
 import {
   filtersText,
@@ -69,7 +70,12 @@ export async function consumeNumericFilterInput(chatId, text, userMessageId = nu
       await bot.sendMessage(chatId, 'Strategy changed while input was pending. Open Strategy menu and try again.');
       return true;
     }
-    const newConfig = { ...strat, [pending.key]: value };
+    const parsed = validateStrategySetting(pending.key, value);
+    if (!parsed.ok) {
+      await bot.sendMessage(chatId, `Rejected: ${parsed.error}`);
+      return true;
+    }
+    const newConfig = { ...strat, [pending.key]: parsed.value };
     delete newConfig.id;
     delete newConfig.name;
     updateStrategyConfig(strat.id, newConfig);
@@ -85,7 +91,17 @@ export async function consumeNumericFilterInput(chatId, text, userMessageId = nu
       await bot.sendMessage(chatId, strategyMenuText(), { parse_mode: 'HTML', ...strategyKeyboard() });
     }
   } else {
-    setSetting(pending.key, String(value));
+    const rule = numericRule(pending.key);
+    if (rule) {
+      const parsed = normalizeNumericSetting(pending.key, value);
+      if (!parsed.ok) {
+        await bot.sendMessage(chatId, `Rejected: ${parsed.error}`);
+        return true;
+      }
+      setSetting(pending.key, String(parsed.value));
+    } else {
+      setSetting(pending.key, String(value));
+    }
     if (pending.messageId) {
       await bot.editMessageText(filtersText(), {
         chat_id: chatId,

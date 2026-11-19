@@ -60,8 +60,14 @@ export async function executeLiveBuy(selectedRow, decision, batchId, rows = [], 
   await sendPositionOpen(positionId);
 }
 
-export async function executeLiveSell(position, reason) {
-  const amount = position.token_amount_raw || position.token_amount_est;
+export async function executeLiveSell(position, reason, { exact = false } = {}) {
+  // Full exits sell whatever the wallet actually holds; a stored estimate is not
+  // a balance and would leave dust or fail outright. Partial exits pass `exact`.
+  let amount = position.token_amount_raw || position.token_amount_est;
+  if (!exact) {
+    const liveBalance = await fetchLiveTokenBalance(position.mint);
+    if (liveBalance && Number(liveBalance) > 0) amount = liveBalance;
+  }
   if (!amount || Number(amount) <= 0) throw new Error('Live position has no token amount to sell.');
   return executeJupiterSwap({
     inputMint: position.mint,

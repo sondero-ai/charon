@@ -22,11 +22,13 @@ import { candidateSummary } from './format.js';
 import { candidateById, updateCandidateStatus } from '../db/candidates.js';
 import { storeDecision, logDecisionEvent } from '../db/decisions.js';
 import { createDryRunPosition, canOpenMorePositions, openPositionCount, tradingMode } from '../db/positions.js';
+import { createTradeIntent } from '../db/intents.js';
 import { executeLiveBuy, executeConfirmedIntent, rejectIntent } from '../execution/router.js';
 import { sendCandidate, sendPosition, closePosition, updatePositionRule, toggleTrailing } from './commands.js';
 import { requestNumericFilterInput, requestStrategyNumericInput } from './input.js';
 import { isAuthorizedChat, isAuthorizedUser, rejectUnauthorized } from './auth.js';
 import { requestModeArm, confirmModeArm } from './modeSwitch.js';
+import { normalizeNumericSetting } from '../strategySchema.js';
 
 export async function handleCallback(query) {
   const data = query.data || '';
@@ -112,8 +114,32 @@ export async function handleCallback(query) {
     const decision = { verdict: 'BUY', confidence: 100, reason: 'Manual dry buy', risks: [], suggested_tp_percent: numSetting('default_tp_percent', 50), suggested_sl_percent: numSetting('default_sl_percent', -25) };
     const decisionId = storeDecision(row.id, candidate, decision);
     decision.id = decisionId;
-    if (tradingMode() === 'live') {
-      await executeLiveBuy(row, decision, 'manual', [row], row.id);
+    const mode = tradingMode();
+    // A manual tap must honour the mode exactly: confirm asks, live spends,
+    // dry_run never touches the chain. Anything else is a silent lie.
+    if (mode === 'confirm') {
+      const intentId = createTradeIntent(row.id, candidate, decision, mode, 'pending_confirmation');
+      logDecisionEvent({
+        batchId: 'manual',
+        triggerCandidateId: row.id,
+        selectedRow: row,
+        rows: [row],
+        decision,
+        mode,
+        action: 'manual_confirm_intent',
+        execution: { intentId },
+      });
+      return sendTradeIntent(intentId, candidate, decision);
+    }
+    if (mode === 'live') {
+      try {
+        await executeLiveBuy(row, decision, 'manual', [row], row.id);
+      } catch (err) {
+        const message = err.code === 'DUPLICATE_POSITION'
+          ? 'Refused: an open position for this mint already exists. Nothing was swapped.'
+          : `Live buy failed: ${err.message}`;
+        return bot.sendMessage(chatId, message);
+      }
       return;
     }
     const positionId = await createDryRunPosition(row.id, candidate, decision, 'manual_buy');
@@ -123,7 +149,7 @@ export async function handleCallback(query) {
       selectedRow: row,
       rows: [row],
       decision,
-      mode: tradingMode(),
+      mode,
       action: 'manual_dry_run_entry',
       execution: { positionId },
     });
@@ -263,6 +289,18 @@ async function updateSettingFromButton(query, key, value) {
   if (!valid.has(key) || value == null) return bot.sendMessage(chatId, 'Unknown setting.');
   if (key === 'trading_mode' && value !== 'dry_run') {
     return bot.sendMessage(chatId, 'confirm/live must be armed from the Agent menu.');
+  }
+  if (key === 'llm_min_confidence') {
+    // Must land where the gate reads it: the active strategy, not a global that
+    // silently loses to the strategy default.
+    const strat = activeStrategy();
+    const parsed = normalizeNumericSetting(key, value);
+    if (!parsed.ok) return bot.sendMessage(chatId, `Rejected: ${parsed.error}`);
+    const config = { ...strat, llm_min_confidence: parsed.value };
+    delete config.id;
+    delete config.name;
+    updateStrategyConfig(strat.id, config);
+    return bot.sendMessage(chatId, agentText(), { parse_mode: 'HTML', ...agentKeyboard() });
   }
   setSetting(key, value);
   const text = key.startsWith('default_') || key === 'dry_run_buy_sol' || key === 'trading_mode' || key === 'llm_min_confidence' || key === 'llm_candidate_pick_count' || key === 'llm_candidate_max_age_ms' || key === 'max_open_positions'
