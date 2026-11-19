@@ -25,10 +25,17 @@ import { createDryRunPosition, canOpenMorePositions, openPositionCount, tradingM
 import { executeLiveBuy, executeConfirmedIntent, rejectIntent } from '../execution/router.js';
 import { sendCandidate, sendPosition, closePosition, updatePositionRule, toggleTrailing } from './commands.js';
 import { requestNumericFilterInput, requestStrategyNumericInput } from './input.js';
+import { isAuthorizedChat, isAuthorizedUser, rejectUnauthorized } from './auth.js';
+import { requestModeArm, confirmModeArm } from './modeSwitch.js';
 
 export async function handleCallback(query) {
   const data = query.data || '';
   const chatId = query.message?.chat?.id || TELEGRAM_CHAT_ID;
+  const userId = query.from?.id;
+  if (!isAuthorizedChat(query.message?.chat?.id) || !isAuthorizedUser(userId)) {
+    rejectUnauthorized({ kind: 'callback', chatId, userId, detail: data.slice(0, 32) });
+    return answerCallback(query);
+  }
   await answerCallback(query);
   if (!data.startsWith('input:') && !data.startsWith('stratinput:')) {
     const { pendingNumericInputs } = await import('./input.js');
@@ -79,8 +86,12 @@ export async function handleCallback(query) {
   }
 
   const [kind, id, value] = data.split(':');
+  if (kind === 'modeconfirm') return confirmModeArm({ chatId, userId, mode: id, query });
   if (kind === 'input') return requestNumericFilterInput(query, id);
-  if (kind === 'set') return updateSettingFromButton(query, id, value);
+  if (kind === 'set') {
+    if (id === 'trading_mode' && value !== 'dry_run') return requestModeArm({ chatId, userId, mode: value });
+    return updateSettingFromButton(query, id, value);
+  }
   if (kind === 'batch') return sendBatch(chatId, Number(id));
   if (kind === 'intent') {
     if (value === 'confirm') return executeConfirmedIntent(chatId, Number(id));
@@ -250,6 +261,9 @@ async function updateSettingFromButton(query, key, value) {
     'default_trailing_percent',
   ]);
   if (!valid.has(key) || value == null) return bot.sendMessage(chatId, 'Unknown setting.');
+  if (key === 'trading_mode' && value !== 'dry_run') {
+    return bot.sendMessage(chatId, 'confirm/live must be armed from the Agent menu.');
+  }
   setSetting(key, value);
   const text = key.startsWith('default_') || key === 'dry_run_buy_sol' || key === 'trading_mode' || key === 'llm_min_confidence' || key === 'llm_candidate_pick_count' || key === 'llm_candidate_max_age_ms' || key === 'max_open_positions'
     ? agentText()

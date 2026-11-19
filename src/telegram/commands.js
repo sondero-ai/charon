@@ -29,10 +29,16 @@ import { handleCallback, editMenuMessage } from './callbacks.js';
 import { consumeNumericFilterInput } from './input.js';
 import { runLearning, sendLessons } from '../learning/commands.js';
 import { fetchWalletPnl } from '../enrichment/wallets.js';
+import { isAuthorizedChat, isAuthorizedUser, rejectUnauthorized } from './auth.js';
 
 export async function handleMessage(msg) {
   const text = (msg.text || '').trim();
-  const chatId = msg.chat.id;
+  const chatId = msg.chat?.id;
+  const userId = msg.from?.id;
+  if (!isAuthorizedChat(chatId) || !isAuthorizedUser(userId)) {
+    rejectUnauthorized({ kind: 'message', chatId, userId, detail: text.slice(0, 32) });
+    return;
+  }
   if (await consumeNumericFilterInput(chatId, text, msg.message_id)) return;
   if (!text.startsWith('/')) return;
   if (text.startsWith('/menu')) return sendMenu(chatId);
@@ -103,7 +109,7 @@ export async function handleMessage(msg) {
     db.prepare('DELETE FROM saved_wallets WHERE label = ?').run(label);
     return bot.sendMessage(chatId, `Removed ${label}.`);
   }
-  if (text.startsWith('/wallets')) return handleCallback({ id: 'manual', data: 'menu:wallets', message: { chat: { id: chatId } } });
+  if (text.startsWith('/wallets')) return handleCallback({ id: 'manual', from: msg.from, data: 'menu:wallets', message: { chat: { id: chatId } } });
   if (text.startsWith('/setfilter')) {
     const { key, value } = parseSetFilter(text);
     const valid = new Set([
@@ -137,6 +143,9 @@ export async function handleMessage(msg) {
     ]);
     if (!valid.has(key) || value == null) {
       return bot.sendMessage(chatId, `Usage: /setfilter &lt;name&gt; &lt;value&gt;\n\n${filtersText()}`, { parse_mode: 'HTML' });
+    }
+    if (key === 'trading_mode' && value !== 'dry_run') {
+      return bot.sendMessage(chatId, 'confirm/live requires the armed confirmation: /menu → Agent → mode button, then tap confirm.');
     }
     setSetting(key, value === 'off' ? '0' : value);
     return bot.sendMessage(chatId, filtersText(), { parse_mode: 'HTML' });

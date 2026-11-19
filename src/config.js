@@ -13,6 +13,9 @@ export const SOL_MINT = 'So11111111111111111111111111111111111111111';
 export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 export const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 export const TELEGRAM_TOPIC_ID = process.env.TELEGRAM_TOPIC_ID;
+// Optional comma-separated Telegram user ids allowed to drive the bot inside
+// TELEGRAM_CHAT_ID. Empty means any member of that chat may issue commands.
+export const OPERATOR_USER_IDS = process.env.OPERATOR_USER_IDS || '';
 export const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 export const GMGN_API_KEY = process.env.GMGN_API_KEY;
 export const GMGN_ENABLED = process.env.GMGN_ENABLED !== 'false';
