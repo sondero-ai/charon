@@ -31,6 +31,11 @@ Tests set `DB_PATH` to a throwaway file and `TELEGRAM_POLLING=false` before
 importing anything, because `src/config.js` reads env at module load and
 `src/db/connection.js` resolves the database path once.
 
+They must also neutralize any value a local `.env` would inject: dotenv does not
+override variables that are already set, but it does fill in the ones a test
+forgets to pin. `OPERATOR_USER_IDS` is the known trap — a real id there makes
+every authorized-callback test fail with a rejection.
+
 Every test file needs a unique `DB_PATH`; `node --test` runs files in separate
 processes but sharing one file would cross-contaminate.
 

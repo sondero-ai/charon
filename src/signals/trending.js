@@ -37,18 +37,23 @@ export function trendingSignalPass(row) {
   return true;
 }
 
+let keylessTrendingWarned = false;
+
 export async function fetchJupiterTrendingRows(interval, limit) {
-  if (!JUPITER_API_KEY) {
-    console.log('[trending:jupiter] JUPITER_API_KEY missing');
-    return [];
-  }
   const supported = new Set(['5m', '1h', '6h', '24h']);
   const window = supported.has(interval) ? interval : '5m';
   const url = new URL(`https://api.jup.ag/tokens/v2/toptrending/${window}`);
   url.searchParams.set('limit', String(limit));
+  const headers = { ...JSON_HEADERS };
+  if (JUPITER_API_KEY) {
+    headers['x-api-key'] = JUPITER_API_KEY;
+  } else if (!keylessTrendingWarned) {
+    keylessTrendingWarned = true;
+    console.log('[trending:jupiter] no JUPITER_API_KEY, using the keyless endpoint (rate limited)');
+  }
   const res = await axios.get(url.toString(), {
     timeout: 10_000,
-    headers: { ...JSON_HEADERS, 'x-api-key': JUPITER_API_KEY },
+    headers,
   });
   const rows = Array.isArray(res.data) ? res.data : [];
   return rows.map((row, index) => normalizeJupiterTrendingRow(row, window, index + 1));

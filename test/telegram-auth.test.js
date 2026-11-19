@@ -10,6 +10,9 @@ process.env.TELEGRAM_POLLING = 'false';
 process.env.TELEGRAM_CHAT_ID = '-100777';
 process.env.TELEGRAM_BOT_TOKEN = '123456:AAtestTokenForSuite000000000000000';
 process.env.TRADING_MODE = 'dry_run';
+// A real .env in the repo root would otherwise pin this to the operator's ids
+// and every authorized-callback test below would be rejected.
+process.env.OPERATOR_USER_IDS = '';
 
 const { initDb, closeDb } = await import('../src/db/connection.js');
 const { bot } = await import('../src/telegram/bot.js');
