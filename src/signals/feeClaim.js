@@ -67,9 +67,12 @@ export function startWebsocket() {
   const wsUrl = SOLANA_WS_URL;
   let ws;
   let pingTimer;
+  let failures = 0;
   function connect() {
     ws = new WebSocket(wsUrl);
     ws.on('open', () => {
+      if (failures > 0) console.log(`[ws] reconnected after ${failures} failed attempt(s)`);
+      failures = 0;
       console.log('[ws] connected');
       for (const [id, program] of [[1, PUMP_PROGRAM], [2, PUMP_AMM]]) {
         ws.send(JSON.stringify({
@@ -97,10 +100,18 @@ export function startWebsocket() {
     });
     ws.on('close', () => {
       clearInterval(pingTimer);
-      console.log('[ws] closed, reconnecting in 5s');
-      setTimeout(connect, 5000);
+      failures += 1;
+      // Free public RPC throttles logsSubscribe with 413s. Back off instead of
+      // hammering it every 5s and drowning the log.
+      const delay = Math.min(60_000, 5_000 * 2 ** Math.min(failures - 1, 4));
+      if (failures <= 3 || failures % 20 === 0) {
+        console.log(`[ws] closed (${failures}x), retry in ${Math.round(delay / 1000)}s`);
+      }
+      setTimeout(connect, delay);
     });
-    ws.on('error', error => console.log(`[ws] ${error.message}`));
+    ws.on('error', error => {
+      if (failures <= 3) console.log(`[ws] ${error.message}`);
+    });
   }
   connect();
 }

@@ -57,8 +57,12 @@ effort Telegram alert, exit non-zero so PM2 restarts cleanly), handles
      `/api/signals` every `SIGNAL_POLL_MS`, plus the dip-alert monitor when the
      strategy is `wait_for_dip`.
    - **Standalone mode** — only when the signal URL is empty. Polls Pump.fun
-     graduated coins and GMGN trending directly, and opens the fee-claim
-     WebSocket.
+     graduated coins and Jupiter trending directly, opens the fee-claim
+     WebSocket, and subscribes to PumpPortal's migration feed
+     (`src/signals/migrationWatcher.js`). A migration is the standalone
+     equivalent of a "graduated" signal: it feeds the `graduated` map and
+     triggers a candidate, with one delayed re-check 90 s later because Jupiter's
+     asset index lags a fresh migration.
 6. Starts the position monitor loop and the six-hourly retention prune.
 
 ## Module map

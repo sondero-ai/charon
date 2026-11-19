@@ -9,12 +9,19 @@ import { candidateButtons, batchRevealButtons, positionButtons, intentButtons } 
 import { batchById } from '../db/decisions.js';
 
 export async function sendTelegram(text, extra = {}) {
-  return bot.sendMessage(TELEGRAM_CHAT_ID, text, {
-    parse_mode: 'HTML',
-    disable_web_page_preview: true,
-    ...(TELEGRAM_TOPIC_ID ? { message_thread_id: Number(TELEGRAM_TOPIC_ID) } : {}),
-    ...extra,
-  });
+  try {
+    return await bot.sendMessage(TELEGRAM_CHAT_ID, text, {
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      ...(TELEGRAM_TOPIC_ID ? { message_thread_id: Number(TELEGRAM_TOPIC_ID) } : {}),
+      ...extra,
+    });
+  } catch (error) {
+    // A Telegram outage must not abort the pipeline: the decision, the intent and
+    // the position row still have to be written. Callers only need a null-safe id.
+    console.log(`[telegram] send failed: ${error.message}`);
+    return { message_id: null, failed: true };
+  }
 }
 
 export async function sendBatchReveal(batchId, rows, decision, triggerCandidateId) {

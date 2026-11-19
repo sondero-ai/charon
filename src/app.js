@@ -47,9 +47,14 @@ export async function startCharon() {
     const { fetchGraduatedCoins } = await import('./signals/graduated.js');
     const { fetchGmgnTrending, setDegenHandler } = await import('./signals/trending.js');
     const { startWebsocket, setCandidateHandler } = await import('./signals/feeClaim.js');
+    const { startMigrationWatcher, setMigrationHandler } = await import('./signals/migrationWatcher.js');
 
     setDegenHandler(maybeProcessDegenCandidate);
     setCandidateHandler(processCandidateFromSignals);
+    // Without a signal server the migration feed is what turns a graduation into
+    // a candidate; fee claims and trending only add context to it.
+    setMigrationHandler(processCandidateFromSignals);
+    startMigrationWatcher();
 
     await fetchGraduatedCoins().catch(error => console.log(`[graduated] initial fetch failed: ${error.message}`));
     await fetchGmgnTrending().catch(error => console.log(`[trending] initial fetch failed: ${error.message}`));
