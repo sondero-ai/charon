@@ -26,7 +26,7 @@ const RULES = {
   min_holders: { min: 0, max: 1_000_000, integer: true },
   max_top20_holder_percent: { min: 1, max: 100, off: 100 },
   min_saved_wallet_holders: { min: 0, max: 1_000, integer: true },
-  max_ath_distance_pct: { min: -100, max: 0 },
+  max_ath_distance_pct: { min: -100, max: 0, off: 0 },
   token_age_max_ms: { min: 0, max: 30 * 24 * 60 * 60 * 1000, integer: true },
   min_gmgn_total_fee_sol: { min: 0, max: 1_000_000 },
   min_graduated_volume_usd: { min: 0, max: 1_000_000_000 },
