@@ -62,10 +62,6 @@ export function candidateById(id) {
   return row ? { ...row, candidate: safeJson(row.candidate_json, {}) } : null;
 }
 
-export function candidatesByIds(ids) {
-  return ids.map(id => candidateById(Number(id))).filter(Boolean);
-}
-
 export function latestCandidateByMint(mint) {
   const row = db.prepare('SELECT * FROM candidates WHERE mint = ? ORDER BY id DESC LIMIT 1').get(mint);
   return row ? { ...row, candidate: safeJson(row.candidate_json, {}) } : null;

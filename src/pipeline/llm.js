@@ -148,9 +148,3 @@ export async function decideCandidateBatch(rows, triggerCandidateId) {
     };
   }
 }
-
-export async function decideCandidate(candidate) {
-  const pseudoRow = { id: 0, candidate };
-  const decision = await decideCandidateBatch([pseudoRow], 0);
-  return normalizeDecision(decision.raw || decision, decision.reason);
-}

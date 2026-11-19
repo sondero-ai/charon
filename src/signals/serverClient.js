@@ -30,6 +30,20 @@ async function triggerCandidate({ mint, fee, signature, graduatedCoin, trendingT
   await candidateHandler({ mint, fee, signature, graduatedCoin, trendingToken, route });
 }
 
+/**
+ * A single failing candidate (enrichment timeout, DB write) must not abort the
+ * whole poll cycle and starve every other signal.
+ */
+async function safeTrigger(args) {
+  try {
+    await triggerCandidate(args);
+    return true;
+  } catch (err) {
+    console.log(`[server] trigger ${args.mint} failed: ${err.message}`);
+    return false;
+  }
+}
+
 export async function fetchServerSignals() {
   try {
     const url = new URL('/api/signals', SIGNAL_SERVER_URL);
@@ -92,7 +106,7 @@ export async function fetchServerSignals() {
       seenSignals.set(key, now());
 
       // Store signal events
-      for (const source of signal.sources) {
+      for (const source of signal.sources || []) {
         const kind = source.includes('trending') ? 'trending' : source.includes('fee') ? 'fee_claim' : 'graduated';
         storeSignalEvent(mint, kind, source, signal);
       }
@@ -130,7 +144,9 @@ export async function fetchServerSignals() {
       if (signal.feeClaim) {
         fee = {
           mint,
-          distributed: BigInt(Math.floor(signal.feeClaim.distributedSol * 1e9)),
+          // Coerce before BigInt: a missing distributedSol used to throw
+          // RangeError and abort the whole poll cycle.
+          distributed: BigInt(Math.floor(Number(signal.feeClaim.distributedSol || 0) * 1e9)),
           shareholders: (signal.feeClaim.shareholders || []).map(h => ({
             pubkey: h.address,
             bps: h.bps,
@@ -145,27 +161,29 @@ export async function fetchServerSignals() {
         const athDist = signal.graduated?.distanceFromAthPercent;
         if (athDist != null && athDist <= strat.max_ath_distance_pct) {
           // Already at dip target, trigger immediately
-          await triggerCandidate({ mint, fee, signature, graduatedCoin, trendingToken, route });
-          triggered++;
+          if (await safeTrigger({ mint, fee, signature, graduatedCoin, trendingToken, route })) triggered++;
         } else {
           // Store price alert for later
           const { storePriceAlert } = await import('./priceMonitor.js');
           const targetPrice = signal.priceUsd ? signal.priceUsd * (1 + strat.max_ath_distance_pct / 100) : null;
-          storePriceAlert({
-            mint,
-            strategyId: strat.id,
-            alertType: 'dip_target',
-            targetPriceUsd: targetPrice,
-            targetAthDistancePercent: strat.max_ath_distance_pct,
-            signal,
-            expiresMs: 24 * 60 * 60 * 1000,
-          });
-          dipAlerts++;
+          try {
+            storePriceAlert({
+              mint,
+              strategyId: strat.id,
+              alertType: 'dip_target',
+              targetPriceUsd: targetPrice,
+              targetAthDistancePercent: strat.max_ath_distance_pct,
+              signal,
+              expiresMs: 24 * 60 * 60 * 1000,
+            });
+            dipAlerts++;
+          } catch (err) {
+            console.log(`[server] dip alert ${mint} failed: ${err.message}`);
+          }
         }
       } else {
         // Immediate entry mode (sniper, smart_money, degen)
-        await triggerCandidate({ mint, fee, signature, graduatedCoin, trendingToken, route });
-        triggered++;
+        if (await safeTrigger({ mint, fee, signature, graduatedCoin, trendingToken, route })) triggered++;
       }
 
       processed++;

@@ -17,14 +17,6 @@ export async function sendTelegram(text, extra = {}) {
   });
 }
 
-export async function sendCandidateAlert(candidateId, candidate, decision) {
-  const sent = await sendTelegram(candidateSummary(candidate, decision), candidateButtons(candidateId, decision));
-  db.prepare(`
-    INSERT INTO alerts (candidate_id, mint, kind, sent_at_ms, telegram_message_id, payload_json)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(candidateId, candidate.token.mint, 'candidate', now(), sent.message_id, json({ candidate, decision }));
-}
-
 export async function sendBatchReveal(batchId, rows, decision, triggerCandidateId) {
   const sent = await sendTelegram(
     batchRevealSummary(batchId, rows, decision, triggerCandidateId),

@@ -91,13 +91,6 @@ async function fetchSolUsdPrice() {
   }
 }
 
-async function estimateTokenAmountFromSol(sizeSol, entryPrice) {
-  if (!Number.isFinite(Number(entryPrice)) || Number(entryPrice) <= 0) return null;
-  const solUsd = await fetchSolUsdPrice();
-  if (!Number.isFinite(Number(solUsd)) || Number(solUsd) <= 0) return null;
-  return Number(sizeSol) * solUsd / Number(entryPrice);
-}
-
 async function fetchJupiterHolders(mint) {
   try {
     const res = await axios.get(`https://datapi.jup.ag/v1/holders/${mint}`, {
@@ -226,7 +219,6 @@ export {
   normalizeJupiterTrendingRow,
   fetchJupiterAsset,
   fetchSolUsdPrice,
-  estimateTokenAmountFromSol,
   fetchJupiterHolders,
   summarizeCandles,
   fetchJupiterChartWindow,

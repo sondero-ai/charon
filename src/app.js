@@ -7,6 +7,7 @@ import { monitorPositions } from './execution/positions.js';
 import { processCandidateFromSignals, maybeProcessDegenCandidate } from './pipeline/orchestrator.js';
 import { sendTelegram } from './telegram/send.js';
 import { makeFailureTracker } from './utils.js';
+import { pruneOldRows } from './db/maintenance.js';
 
 setDefaultResultOrder('ipv4first');
 validateConfig();
@@ -60,4 +61,17 @@ export async function startCharon() {
   // Position monitoring runs in both modes
   const trackPositions = makeFailureTracker('position monitor', (msg) => sendTelegram(msg));
   setInterval(() => trackPositions(() => monitorPositions()), POSITION_CHECK_MS);
+
+  // Retention: decision_logs stores a full candidate JSON per event, which is
+  // tens of MB a day. Prune on boot and every six hours.
+  const prune = () => {
+    try {
+      const summary = pruneOldRows();
+      console.log(`[maintenance] pruned ${JSON.stringify(summary)}`);
+    } catch (error) {
+      console.log(`[maintenance] prune failed: ${error.message}`);
+    }
+  };
+  prune();
+  setInterval(prune, 6 * 60 * 60 * 1000);
 }

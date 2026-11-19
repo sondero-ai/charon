@@ -3,7 +3,7 @@ import { numSetting } from '../db/settings.js';
 import { db } from '../db/connection.js';
 import { WSOL_MINT, minimumEntryLamports } from '../config.js';
 import { escapeHtml, fmtSol } from '../format.js';
-import { executeJupiterSwap, liveWalletBalanceLamports, fetchLiveTokenBalance, confirmSwapFill, liveWalletPubkey } from '../liveExecutor.js';
+import { executeJupiterSwap, liveWalletBalanceLamports, fetchLiveTokenBalance, confirmSwapFill, liveWalletPubkey, assertTokenSafety } from '../liveExecutor.js';
 import { canOpenMorePositions, openPositionCount, currentPositionSizeSol, reserveLivePosition, finalizeLivePosition, failLivePosition } from '../db/positions.js';
 import { intentById, claimIntent, settleIntent } from '../db/intents.js';
 import { logDecisionEvent } from '../db/decisions.js';
@@ -22,6 +22,9 @@ export async function executeLiveBuy(selectedRow, decision, batchId, rows = [], 
     throw new Error(`Insufficient SOL balance. Need ${fmtSol(requiredLamports / 1_000_000_000)} SOL including reserve, ATA rent, and fee buffer.`);
   }
   const mint = selectedRow.candidate.token.mint;
+  // Token safety first: a frozen mint is an unsellable position, and it is
+  // cheaper to refuse than to discover it at exit time.
+  await assertTokenSafety(mint);
   // Reserve before signing. A duplicate is refused here, with no SOL spent.
   const positionId = reserveLivePosition(selectedRow.id, selectedRow.candidate, decision, `live_batch_${batchId}`);
   let swap;
@@ -111,6 +114,7 @@ export async function executeConfirmedIntent(chatId, intentId) {
       settleIntent(intentId, 'rejected_insufficient_balance', { error: 'insufficient SOL including reserve, ATA rent, and fee buffer' });
       return bot.sendMessage(chatId, `Insufficient SOL balance. Need ${fmtSol(requiredLamports / 1_000_000_000)} SOL.`, { parse_mode: 'HTML' });
     }
+    await assertTokenSafety(freshRow.candidate.token.mint);
     positionId = reserveLivePosition(intent.candidate_id, freshRow.candidate, decision, `confirmed_intent_${intentId}`);
     const swap = await executeJupiterSwap({
       inputMint: WSOL_MINT,

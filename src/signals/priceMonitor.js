@@ -40,13 +40,6 @@ export function getActiveAlerts() {
   ).all(now());
 }
 
-export function getAlertStats() {
-  const pending = db.prepare("SELECT COUNT(*) as c FROM price_alerts WHERE status = 'pending'").get().c;
-  const triggered = db.prepare("SELECT COUNT(*) as c FROM price_alerts WHERE status = 'triggered'").get().c;
-  const expired = db.prepare("SELECT COUNT(*) as c FROM price_alerts WHERE status = 'expired'").get().c;
-  return { pending, triggered, expired };
-}
-
 export async function monitorPriceAlerts() {
   const alerts = getActiveAlerts();
   if (!alerts.length) return;

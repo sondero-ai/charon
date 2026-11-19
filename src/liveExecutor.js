@@ -8,6 +8,7 @@ import {
   SOLANA_PRIVATE_KEY,
   SOLANA_RPC_URL,
 } from './config.js';
+import { scrubMessage } from './utils.js';
 
 let liveWallet = null;
 let solanaConnection = null;
@@ -51,7 +52,7 @@ export async function fetchLiveTokenBalance(mint) {
     );
     return accounts.value[0]?.account?.data?.parsed?.info?.tokenAmount?.amount || null;
   } catch (err) {
-    console.log(`[live] token balance ${mint.slice(0, 8)}... ${err.message}`);
+    console.log(`[live] token balance ${mint.slice(0, 8)}... ${scrubMessage(err.message)}`);
     return null;
   }
 }
@@ -59,6 +60,27 @@ export async function fetchLiveTokenBalance(mint) {
 export function requireLiveExecution() {
   if (!liveWallet || !solanaConnection) throw new Error('SOLANA_PRIVATE_KEY is required for live execution.');
   if (!JUPITER_API_KEY) throw new Error('JUPITER_API_KEY is required for live execution.');
+}
+
+const TOKEN_2022_PROGRAM_ID = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+
+/**
+ * Refuses a mint with live mint/freeze authority or a Token-2022 extension. Those
+ * can be frozen or inflated after entry, which turns a monitored position into an
+ * unsellable one and no exit rule can save it.
+ */
+export async function assertTokenSafety(mint) {
+  if (!solanaConnection) throw new Error('SOLANA_RPC_URL is required to verify a token before live entry.');
+  const info = await solanaConnection.getParsedAccountInfo(new PublicKey(mint), 'confirmed');
+  const value = info?.value;
+  if (!value) throw new Error(`Mint ${String(mint).slice(0, 8)}... not found on chain; refusing live entry.`);
+  const owner = value.owner?.toBase58?.() || '';
+  if (owner === TOKEN_2022_PROGRAM_ID) throw new Error('Token-2022 mint refused: extensions are unvetted.');
+  const parsed = value.data?.parsed?.info;
+  if (!parsed) throw new Error('Mint account could not be parsed; refusing live entry.');
+  if (parsed.mintAuthority) throw new Error('Mint authority is still active; refusing live entry.');
+  if (parsed.freezeAuthority) throw new Error('Freeze authority is active; refusing live entry.');
+  return { decimals: parsed.decimals, supply: parsed.supply };
 }
 
 export async function liveWalletBalanceLamports() {
@@ -128,7 +150,7 @@ export async function confirmSwapFill(signature, { mint, owner } = {}) {
         maxSupportedTransactionVersion: 0,
       });
     } catch (err) {
-      console.log(`[live] fill lookup ${String(signature).slice(0, 8)}... ${err.message}`);
+      console.log(`[live] fill lookup ${String(signature).slice(0, 8)}... ${scrubMessage(err.message)}`);
     }
     if (tx) {
       const meta = tx.meta || {};

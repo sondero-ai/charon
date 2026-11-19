@@ -1,7 +1,25 @@
 import Database from 'better-sqlite3';
+import { isAbsolute, resolve } from 'node:path';
 import { DB_PATH } from '../config.js';
 
-export const db = new Database(DB_PATH);
+// A relative DB_PATH used to resolve against the process cwd, so starting PM2
+// from another directory silently created a second empty database. Anchor it to
+// the project root instead.
+const projectRoot = resolve(import.meta.dirname, '../..');
+const resolvedDbPath = DB_PATH === ':memory:' || isAbsolute(DB_PATH)
+  ? DB_PATH
+  : resolve(projectRoot, DB_PATH);
+
+export const db = new Database(resolvedDbPath);
+db.pragma('busy_timeout = 5000');
+
+export function closeDb() {
+  try {
+    db.close();
+  } catch {
+    // already closed
+  }
+}
 
 export function initDb() {
   db.pragma('journal_mode = WAL');

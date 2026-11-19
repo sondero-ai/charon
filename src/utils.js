@@ -143,6 +143,11 @@ export function formatWindow(ms) {
   return `${Math.round(ms / 60_000)}m`;
 }
 
+/** Strips credentials that leak through URLs (RPC api-key) into logs. */
+export function scrubMessage(message) {
+  return String(message ?? '').replace(/((?:api[-_]?key|token|secret|password)=)[^&\s"']+/gi, '$1[redacted]');
+}
+
 export function makeFailureTracker(name, alertFn, threshold = 3) {
   let count = 0;
   return async (fn) => {
