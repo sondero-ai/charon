@@ -5,6 +5,19 @@ Charon is a Telegram trench agent for screening noisy Pump-token flow with overl
 # ALERT
 This Codebase is on testing-period, developer doesn't guarantee of any result.
 
+## Documentation
+
+Full documentation is in [`docs/`](docs/README.md):
+
+- [Architecture](docs/architecture.md) — module map, data flow, database schema
+- [Configuration](docs/configuration.md) — every env var, setting and strategy bound
+- [Operations](docs/operations.md) — install, PM2/systemd, health checks, backups, upgrades
+- [Trading safety](docs/trading-safety.md) — the guards around every live swap
+- [Telegram](docs/telegram.md) — commands, menus, mode arming
+- [Development](docs/development.md) — tests, conventions, how to add a strategy or filter
+- [Troubleshooting](docs/troubleshooting.md) — symptom to cause to action
+- [Code review archive](docs/audits/2026-11-19-code-review.md) — hardening history and rationale
+
 
 ## Flow
 
