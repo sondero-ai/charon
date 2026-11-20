@@ -56,11 +56,19 @@ export async function startCharon() {
     setMigrationHandler(processCandidateFromSignals);
     startMigrationWatcher();
 
+    // Two windows, because the 5m list only shows what is pumping right now:
+    // the 1h list carries tokens that already proved demand and are still in
+    // the market cap band.
+    const trendingWindows = (process.env.TRENDING_WINDOWS || '5m,1h').split(',').map(w => w.trim()).filter(Boolean);
+    const pollTrending = () => Promise.all(
+      trendingWindows.map(window => fetchGmgnTrending(window).catch(error => console.log(`[trending:${window}] ${error.message}`))),
+    );
+
     await fetchGraduatedCoins().catch(error => console.log(`[graduated] initial fetch failed: ${error.message}`));
-    await fetchGmgnTrending().catch(error => console.log(`[trending] initial fetch failed: ${error.message}`));
+    await pollTrending();
 
     setInterval(() => fetchGraduatedCoins().catch(error => console.log(`[graduated] ${error.message}`)), GRADUATED_POLL_MS);
-    setInterval(() => fetchGmgnTrending().catch(error => console.log(`[trending] ${error.message}`)), TRENDING_POLL_MS);
+    setInterval(pollTrending, TRENDING_POLL_MS);
     startWebsocket();
 
     console.log(`[bot] ${APP_NAME} started (standalone mode)`);

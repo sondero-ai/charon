@@ -23,18 +23,20 @@ setDegenHandler(maybeProcessDegenCandidate);
 setCandidateHandler(processCandidateFromSignals);
 
 export async function processCandidateFromSignals(signals) {
-  // Skip if max positions reached — don't waste enrichment/LLM calls
-  if (!canOpenMorePositions()) {
-    const max = numSetting('max_open_positions', 3);
-    console.log(`[agent] max positions reached (${openPositionCount()}/${max}), skipping ${signals.mint.slice(0, 8)}...`);
-    return;
-  }
-
   const candidate = await buildCandidate(signals);
   const signature = signals.signature || null;
   const candidateId = upsertCandidate(candidate, signature);
   if (!candidate.filters.passed) {
     console.log(`[candidate] filtered ${candidate.token.mint.slice(0, 8)}... ${candidate.filters.failures.join('; ')}`);
+    return;
+  }
+
+  // Discovery keeps running when the book is full so the operator can still see
+  // the flow; only execution stops. Skipping the build here used to hide every
+  // new token for as long as the position cap was reached.
+  if (!canOpenMorePositions()) {
+    const max = numSetting('max_open_positions', 3);
+    console.log(`[candidate] stored, slots full (${openPositionCount()}/${max}) ${candidate.token.mint.slice(0, 8)}...`);
     return;
   }
 

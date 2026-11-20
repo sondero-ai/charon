@@ -80,12 +80,12 @@ export async function fetchGmgnTrendingRows(interval, limit) {
   }));
 }
 
-export async function fetchGmgnTrending() {
+export async function fetchGmgnTrending(intervalOverride = null) {
   if (!boolSetting('trending_enabled', true)) {
     trending.clear();
     return;
   }
-  const interval = setting('trending_interval', '5m');
+  const interval = intervalOverride || setting('trending_interval', '5m');
   const limit = Math.max(1, Math.min(200, Math.floor(numSetting('trending_limit', 100))));
   const source = setting('trending_source', 'jupiter');
 
@@ -108,7 +108,7 @@ export async function fetchGmgnTrending() {
       storeSignalEvent(mint, 'trending', token.source || source, token);
       if (degenHandler) await degenHandler(mint, token);
     }
-    console.log(`[trending:${source}] loaded ${rows.length}, accepted ${tracked}, tracking ${trending.size}`);
+    console.log(`[trending:${source}:${interval}] loaded ${rows.length}, accepted ${tracked}, tracking ${trending.size}`);
   } catch (err) {
     if (source === 'gmgn') setGmgnBackoff('trending', err);
     const status = err.response?.status || '';
