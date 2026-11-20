@@ -233,19 +233,46 @@ export async function handleApprovedBuy(selectedRow, decision, batchId, rows = [
   }
 }
 
+let degenBudgetAtMs = 0;
+let degenBudgetUsed = 0;
+
 export async function maybeProcessDegenCandidate(mint, trendingToken) {
   if (!boolSetting('trending_allow_degen', false)) return;
-  const graduatedCoin = graduated.get(mint);
-  if (!graduatedCoin) return;
-  pruneSeen(seenSignalCandidates, 10 * 60 * 1000);
-  const bucket = Math.floor(now() / (5 * 60 * 1000));
-  const key = `graduated_trending:${mint}:${bucket}`;
+  const strat = activeStrategy();
+
+  // Cheap pre-screen on data that is already in hand: enrichment costs several
+  // HTTP calls per candidate, so a token that cannot clear the market cap band
+  // or the holder floor is dropped before any of that work happens.
+  const mcap = Number(trendingToken?.market_cap ?? 0);
+  const holders = Number(trendingToken?.holder_count ?? 0);
+  const minMcap = Number(strat.min_mcap_usd ?? 0);
+  const maxMcap = Number(strat.max_mcap_usd ?? 0);
+  if (minMcap > 0 && mcap < minMcap) return;
+  if (maxMcap > 0 && mcap > maxMcap) return;
+  if (Number(strat.min_holders ?? 0) > 0 && holders > 0 && holders < strat.min_holders) return;
+
+  // Per-minute budget keeps the trending loop (and Jupiter's rate limit) alive
+  // when a hundred new tokens enter the list at once.
+  const budgetPerMinute = Math.max(1, numSetting('trending_degen_per_min', 10));
+  if (now() - degenBudgetAtMs > 60_000) {
+    degenBudgetAtMs = now();
+    degenBudgetUsed = 0;
+  }
+  if (degenBudgetUsed >= budgetPerMinute) return;
+
+  // One candidate per mint per hour: the trending list re-ranks every minute
+  // and re-enriching an unchanged token is waste.
+  pruneSeen(seenSignalCandidates, 60 * 60 * 1000);
+  const key = `trending:${mint}`;
   if (seenSignalCandidates.has(key)) return;
   seenSignalCandidates.set(key, now());
+  degenBudgetUsed += 1;
+
+  const graduatedCoin = graduated.get(mint) || null;
   await processCandidateFromSignals({
     mint,
     graduatedCoin,
     trendingToken,
-    route: 'graduated_trending',
+    route: graduatedCoin ? 'graduated_trending' : 'trending',
   });
 }
