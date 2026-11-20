@@ -47,6 +47,12 @@ In order:
     `rugcheck_reject_rugged`) all default to `0`, which means observe-only: the
     data is recorded and shown, but nothing is vetoed until an operator sets a
     threshold. A failed Rugcheck lookup is `unknown`, never `safe`.
+11. **Bot activity gate** — `src/enrichment/activity.js` pulls the Jupiter v2
+    snapshot for every candidate and derives trades per trader, average trade
+    size, sell/buy volume ratio and 5 minute price change. A token where 2,000
+    trades come from 130 wallets at about a dollar each is a bot loop, not
+    demand, and is rejected before the LLM ever sees it. Activity data missing
+    means the gate is skipped, never auto-passed.
 
 ## Exit rules
 

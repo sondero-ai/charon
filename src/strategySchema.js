@@ -38,6 +38,10 @@ const RULES = {
   rugcheck_max_dangers: { min: 0, max: 50, integer: true, off: 0 },
   min_lp_locked_pct: { min: 0, max: 100, off: 0 },
   rugcheck_reject_rugged: { min: 0, max: 1, integer: true, off: 0 },
+  max_trades_per_trader_5m: { min: 0, max: 500, off: 0 },
+  min_avg_trade_usd_5m: { min: 0, max: 1_000_000, off: 0 },
+  max_sell_buy_ratio_5m: { min: 0, max: 1000, off: 0 },
+  max_price_drop_5m_pct: { min: -100, max: 0, off: 0 },
 
   // global settings reachable from /setfilter and the numeric input flow
   dry_run_buy_sol: { min: 0.001, max: MAX_POSITION_SOL },

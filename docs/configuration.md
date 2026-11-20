@@ -65,6 +65,11 @@ alert, exit code 1.
 | `RUGCHECK_TIMEOUT_MS` | `8000` | Per-request timeout. |
 | `RUGCHECK_CACHE_TTL_MS` | `300000` | Success cache. Failures are cached for `RUGCHECK_FAILURE_TTL_MS` (60 s). |
 | `RUGCHECK_REQUEST_DELAY_MS` | `1200` | Pacing between requests. |
+| `JUPITER_TOKEN_API_URL` | `https://api.jup.ag/tokens/v2` | Activity source. `lite-api.jup.ag` is a drop-in when the keyed host throttles. |
+| `JUPITER_API_KEY` | empty | Optional. The activity endpoint works keyless but throttles hard, so a key is recommended. |
+| `ACTIVITY_REQUEST_DELAY_MS` | `1200` | Pacing. The free host starts returning 429 below roughly 1/s. |
+| `ACTIVITY_CACHE_TTL_MS` | `30000` | Activity snapshot cache. |
+| `ACTIVITY_RATE_LIMIT_COOLDOWN_MS` | `15000` | Global pause after a 429, then one retry. |
 
 ### Execution
 
@@ -137,7 +142,6 @@ Four strategies ship seeded. Only `sniper` is enabled by default.
 | `max_mcap_usd` | 200000 | 500000 | 1000000 | 100000 | 0 – 1e9 (`0` = off) |
 | `min_fee_claim_sol` | 0.5 | 0 | 0 | 0 | 0 – 10000 |
 | `min_gmgn_total_fee_sol` | 10 | 0 | 0 | 0 | 0 – 1e6 |
-| `min_holders` | 0 | 0 | 1000 | 0 | 0 – 1e6 |
 | `max_top20_holder_percent` | 100 | 100 | 50 | 100 | 1–100 (`off` = 100) |
 | `min_saved_wallet_holders` | 0 | 0 | 0 | 0 | 0 – 1000 |
 | `max_ath_distance_pct` | 0 | −40 | 0 | 0 | −100 – 0 (`off` = 0) |
@@ -149,6 +153,11 @@ Four strategies ship seeded. Only `sniper` is enabled by default.
 | `rugcheck_max_dangers` | 0 | 0 | 0 | 0 | 0–50 (`0` = off) |
 | `min_lp_locked_pct` | 0 | 0 | 0 | 0 | 0–100 (`0` = off) |
 | `rugcheck_reject_rugged` | 0 | 0 | 0 | 0 | 0/1 (`0` = off) |
+| `min_holders` | 50 | 100 | 500 | 50 | 0 – 1e6 (`0` = off) |
+| `max_trades_per_trader_5m` | 4 | 6 | 6 | 5 | 0–500 (`0` = off) |
+| `min_avg_trade_usd_5m` | 8 | 4 | 10 | 5 | 0 – 1e6 (`0` = off) |
+| `max_sell_buy_ratio_5m` | 2.5 | 3.5 | 3 | 3 | 0–1000 (`0` = off) |
+| `max_price_drop_5m_pct` | −35 | −50 | −40 | −40 | −100 – 0 (`0` = off) |
 | `position_size_sol` | 0.1 | 0.05 | 0.1 | 0.05 | 0.001 – `LIVE_MAX_POSITION_SOL` |
 | `max_open_positions` | 3 | 3 | 3 | 5 | 1–20 |
 | `tp_percent` | 50 | 30 | 100 | 30 | 1 – 10000 |

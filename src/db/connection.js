@@ -287,8 +287,13 @@ export function initDb() {
   // Seed default strategies
   const stratInsert = db.prepare('INSERT OR IGNORE INTO strategies (id, name, enabled, config_json, created_at_ms) VALUES (?, ?, ?, ?, ?)');
   const ts = Date.now();
+  const STRATEGY_SEEDS = [];
 
-  stratInsert.run('sniper', 'Sniper', 1, JSON.stringify({
+  STRATEGY_SEEDS.push({
+    id: 'sniper',
+    name: 'Sniper',
+    enabled: 1,
+    config: {
     entry_mode: 'immediate',
     min_source_count: 2,
     require_fee_claim: true,
@@ -297,7 +302,7 @@ export function initDb() {
     max_mcap_usd: 200000,
     min_fee_claim_sol: 0.5,
     min_gmgn_total_fee_sol: 10,
-    min_holders: 0,
+    min_holders: 50,
     max_top20_holder_percent: 100,
     min_saved_wallet_holders: 0,
     max_ath_distance_pct: 0,
@@ -306,6 +311,10 @@ export function initDb() {
     trending_min_swaps: 0,
     trending_max_rug_ratio: 0.3,
     trending_max_bundler_rate: 0.5,
+    max_trades_per_trader_5m: 4,
+    min_avg_trade_usd_5m: 8,
+    max_sell_buy_ratio_5m: 2.5,
+    max_price_drop_5m_pct: -35,
     max_rugcheck_score: 0,
     rugcheck_max_dangers: 0,
     min_lp_locked_pct: 0,
@@ -322,9 +331,14 @@ export function initDb() {
     max_hold_ms: 0,
     use_llm: true,
     llm_min_confidence: 50,
-  }), ts);
+    },
+  });
 
-  stratInsert.run('dip_buy', 'Dip Buy', 0, JSON.stringify({
+  STRATEGY_SEEDS.push({
+    id: 'dip_buy',
+    name: 'Dip Buy',
+    enabled: 0,
+    config: {
     entry_mode: 'wait_for_dip',
     min_source_count: 1,
     require_fee_claim: false,
@@ -333,7 +347,7 @@ export function initDb() {
     max_mcap_usd: 500000,
     min_fee_claim_sol: 0,
     min_gmgn_total_fee_sol: 0,
-    min_holders: 0,
+    min_holders: 100,
     max_top20_holder_percent: 100,
     min_saved_wallet_holders: 0,
     max_ath_distance_pct: -40,
@@ -342,6 +356,10 @@ export function initDb() {
     trending_min_swaps: 0,
     trending_max_rug_ratio: 0.3,
     trending_max_bundler_rate: 0.5,
+    max_trades_per_trader_5m: 6,
+    min_avg_trade_usd_5m: 4,
+    max_sell_buy_ratio_5m: 3.5,
+    max_price_drop_5m_pct: -50,
     max_rugcheck_score: 0,
     rugcheck_max_dangers: 0,
     min_lp_locked_pct: 0,
@@ -358,9 +376,14 @@ export function initDb() {
     max_hold_ms: 0,
     use_llm: true,
     llm_min_confidence: 60,
-  }), ts);
+    },
+  });
 
-  stratInsert.run('smart_money', 'Smart Money', 0, JSON.stringify({
+  STRATEGY_SEEDS.push({
+    id: 'smart_money',
+    name: 'Smart Money',
+    enabled: 0,
+    config: {
     entry_mode: 'immediate',
     min_source_count: 2,
     require_fee_claim: false,
@@ -369,7 +392,7 @@ export function initDb() {
     max_mcap_usd: 1000000,
     min_fee_claim_sol: 0,
     min_gmgn_total_fee_sol: 0,
-    min_holders: 1000,
+    min_holders: 500,
     max_top20_holder_percent: 50,
     min_saved_wallet_holders: 0,
     max_ath_distance_pct: 0,
@@ -378,6 +401,10 @@ export function initDb() {
     trending_min_swaps: 100,
     trending_max_rug_ratio: 0.2,
     trending_max_bundler_rate: 0.3,
+    max_trades_per_trader_5m: 6,
+    min_avg_trade_usd_5m: 10,
+    max_sell_buy_ratio_5m: 3,
+    max_price_drop_5m_pct: -40,
     max_rugcheck_score: 0,
     rugcheck_max_dangers: 0,
     min_lp_locked_pct: 0,
@@ -394,9 +421,14 @@ export function initDb() {
     max_hold_ms: 0,
     use_llm: true,
     llm_min_confidence: 70,
-  }), ts);
+    },
+  });
 
-  stratInsert.run('degen', 'Degen', 0, JSON.stringify({
+  STRATEGY_SEEDS.push({
+    id: 'degen',
+    name: 'Degen',
+    enabled: 0,
+    config: {
     entry_mode: 'immediate',
     min_source_count: 1,
     require_fee_claim: false,
@@ -405,7 +437,7 @@ export function initDb() {
     max_mcap_usd: 100000,
     min_fee_claim_sol: 0,
     min_gmgn_total_fee_sol: 0,
-    min_holders: 0,
+    min_holders: 50,
     max_top20_holder_percent: 100,
     min_saved_wallet_holders: 0,
     max_ath_distance_pct: 0,
@@ -414,6 +446,10 @@ export function initDb() {
     trending_min_swaps: 0,
     trending_max_rug_ratio: 0.5,
     trending_max_bundler_rate: 0.7,
+    max_trades_per_trader_5m: 5,
+    min_avg_trade_usd_5m: 5,
+    max_sell_buy_ratio_5m: 3,
+    max_price_drop_5m_pct: -40,
     max_rugcheck_score: 0,
     rugcheck_max_dangers: 0,
     min_lp_locked_pct: 0,
@@ -430,7 +466,30 @@ export function initDb() {
     max_hold_ms: 0,
     use_llm: false,
     llm_min_confidence: 0,
-  }), ts);
+    },
+  });
+
+  for (const seed of STRATEGY_SEEDS) {
+    stratInsert.run(seed.id, seed.name, seed.enabled, JSON.stringify(seed.config), ts);
+  }
+
+  // Backfill gate keys that were added after this database was created. A
+  // missing key reads as `undefined`, which silently disables the gate, so any
+  // seed key absent from an existing strategy row is merged in.
+  const updateStrategy = db.prepare('UPDATE strategies SET config_json = ? WHERE id = ?');
+  for (const row of db.prepare('SELECT id, config_json FROM strategies').all()) {
+    const seed = STRATEGY_SEEDS.find(candidate => candidate.id === row.id);
+    if (!seed) continue;
+    const current = JSON.parse(row.config_json || '{}');
+    let changed = false;
+    for (const [key, value] of Object.entries(seed.config)) {
+      if (!(key in current)) {
+        current[key] = value;
+        changed = true;
+      }
+    }
+    if (changed) updateStrategy.run(JSON.stringify(current), row.id);
+  }
 }
 
 export function ensureColumn(table, column, ddl) {

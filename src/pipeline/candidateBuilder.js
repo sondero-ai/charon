@@ -5,6 +5,7 @@ import { fetchJupiterAsset, fetchJupiterHolders, fetchJupiterChartContext } from
 import { fetchSavedWalletExposure } from '../enrichment/wallets.js';
 import { fetchTwitterNarrative } from '../enrichment/twitter.js';
 import { fetchRugcheckReport, rugcheckFailures } from '../enrichment/rugcheck.js';
+import { fetchJupiterActivity, activityFailures } from '../enrichment/activity.js';
 import { gmgnLink } from '../format.js';
 
 export function buildFeeSnapshot(fee, signature) {
@@ -117,6 +118,9 @@ export function filterCandidate(candidate) {
   // mode (metrics stored in candidate_json) until an operator turns it on.
   failures.push(...rugcheckFailures(strat, candidate.rugcheck));
 
+  // Bot / pump-and-dump gate: unique traders, trade size and sell pressure.
+  failures.push(...activityFailures(strat, candidate.activity));
+
   return { passed: failures.length === 0, failures, strategy: strat.id };
 }
 
@@ -127,6 +131,7 @@ export async function buildCandidate({ mint, fee = null, signature = null, gradu
   const holders = await fetchJupiterHolders(mint);
   const chart = await fetchJupiterChartContext(mint);
   const rugcheck = await fetchRugcheckReport(mint);
+  const activity = await fetchJupiterActivity(mint);
   const savedWalletExposure = await fetchSavedWalletExposure(mint, holders);
   const twitterNarrative = await fetchTwitterNarrative(graduatedCoin || jupiterAsset, gmgn);
   const priceUsd = firstPositiveNumber(tokenPriceFromGmgn(gmgn), jupiterAsset?.usdPrice, trendingToken?.price);
@@ -158,7 +163,7 @@ export async function buildCandidate({ mint, fee = null, signature = null, gradu
       priceUsd,
       marketCapUsd,
       liquidityUsd: Number(gmgn?.liquidity ?? jupiterAsset?.liquidity ?? trendingToken?.liquidity ?? 0),
-      holderCount: Number(gmgn?.holder_count ?? jupiterAsset?.holderCount ?? trendingToken?.holder_count ?? graduatedCoin?.numHolders ?? 0),
+      holderCount: Number(activity?.holders || gmgn?.holder_count || jupiterAsset?.holderCount || trendingToken?.holder_count || graduatedCoin?.numHolders || 0),
       gmgnTotalFeesSol: Number(gmgn?.total_fee ?? jupiterAsset?.fees ?? 0),
       gmgnTradeFeesSol: Number(gmgn?.trade_fee ?? 0),
       graduatedVolumeUsd: Number(graduatedCoin?.volume ?? 0),
@@ -189,6 +194,7 @@ export async function buildCandidate({ mint, fee = null, signature = null, gradu
     holders,
     chart,
     rugcheck,
+    activity,
     savedWalletExposure,
     twitterNarrative,
     createdAtMs: now(),
