@@ -159,6 +159,10 @@ export async function handleApprovedBuy(selectedRow, decision, batchId, rows = [
 
   if (mode === 'dry_run') {
     const positionId = await createDryRunPosition(freshSelectedRow.id, freshSelectedRow.candidate, decision, `llm_batch_${batchId}`);
+    if (positionId === null) {
+      console.log(`[agent] position cap reached before insert, ${freshSelectedRow.candidate.token.mint.slice(0, 8)} not opened`);
+      return;
+    }
     logDecisionEvent({
       batchId,
       triggerCandidateId,
@@ -167,7 +171,7 @@ export async function handleApprovedBuy(selectedRow, decision, batchId, rows = [
       decision,
       mode,
       action: 'dry_run_entry',
-      guardrails: { maxOpenPositions: numSetting('max_open_positions', 3), openPositions: openPositionCount() },
+      guardrails: { maxOpenPositions: Number(activeStrategy().max_open_positions ?? numSetting('max_open_positions', 3)), openPositions: openPositionCount() },
       execution: { positionId },
     });
     await sendPositionOpen(positionId);

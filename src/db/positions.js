@@ -42,6 +42,13 @@ export function createDryRunPosition(candidateId, candidate, decision, reason = 
     `).get(candidate.token.mint);
     if (existing) return existing.id;
 
+    // Re-check the cap inside the write transaction. Two signal handlers can
+    // pass canOpenMorePositions() at the same time (trending, migration, fee
+    // claim run concurrently) and each would insert, overshooting the limit the
+    // operator set. The count and the insert must happen in one atomic step.
+    const maxPositions = Number(strat.max_open_positions ?? numSetting('max_open_positions', 3));
+    if (maxPositions > 0 && openPositionCount() >= maxPositions) return null;
+
     const result = db.prepare(`
       INSERT INTO dry_run_positions (
         candidate_id, mint, symbol, status, opened_at_ms, size_sol, entry_price, entry_mcap,
@@ -138,6 +145,12 @@ export function reserveLivePosition(candidateId, candidate, decision, reason = '
   const trailingPercent = strat.trailing_percent ?? numSetting('default_trailing_percent', 20);
 
   return db.transaction(() => {
+    // Same reason as the dry-run path: the cap check outside this transaction
+    // can race with a concurrent handler and open an extra live position.
+    const maxPositions = Number(strat.max_open_positions ?? numSetting('max_open_positions', 3));
+    if (maxPositions > 0 && openPositionCount() >= maxPositions) {
+      throw new Error('position cap reached');
+    }
     let result;
     try {
       result = db.prepare(`
