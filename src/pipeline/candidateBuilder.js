@@ -72,8 +72,9 @@ export function filterCandidate(candidate) {
     failures.push(`graduated volume: ${gradVolume} < ${strat.min_graduated_volume_usd}`);
   }
 
-  // Holder count
-  if (strat.min_holders > 0 && holderCount < strat.min_holders) {
+  // Holder count. Zero means "unknown" (no source has seen holders yet), not
+  // "a token with no holders", so it must not veto a fresh migration.
+  if (strat.min_holders > 0 && holderCount > 0 && holderCount < strat.min_holders) {
     failures.push(`holders: ${holderCount} < ${strat.min_holders}`);
   }
 
