@@ -6,6 +6,7 @@ import { fetchSavedWalletExposure } from '../enrichment/wallets.js';
 import { fetchTwitterNarrative } from '../enrichment/twitter.js';
 import { fetchRugcheckReport, rugcheckFailures } from '../enrichment/rugcheck.js';
 import { fetchJupiterActivity, activityFailures } from '../enrichment/activity.js';
+import { fetchDexScreenerToken, dexscreenerMarketCap } from '../enrichment/dexscreener.js';
 import { gmgnLink } from '../format.js';
 
 export function buildFeeSnapshot(fee, signature) {
@@ -133,10 +134,11 @@ export async function buildCandidate({ mint, fee = null, signature = null, gradu
   const chart = await fetchJupiterChartContext(mint);
   const rugcheck = await fetchRugcheckReport(mint);
   const activity = await fetchJupiterActivity(mint);
+  const dexscreener = await fetchDexScreenerToken(mint);
   const savedWalletExposure = await fetchSavedWalletExposure(mint, holders);
   const twitterNarrative = await fetchTwitterNarrative(graduatedCoin || jupiterAsset, gmgn);
-  const priceUsd = firstPositiveNumber(tokenPriceFromGmgn(gmgn), jupiterAsset?.usdPrice, trendingToken?.price);
-  const marketCapUsd = firstPositiveNumber(
+  const basePriceUsd = firstPositiveNumber(tokenPriceFromGmgn(gmgn), jupiterAsset?.usdPrice, trendingToken?.price);
+  const baseMarketCapUsd = firstPositiveNumber(
     marketCapFromGmgn(gmgn),
     jupiterAsset?.mcap,
     jupiterAsset?.fdv,
@@ -144,6 +146,15 @@ export async function buildCandidate({ mint, fee = null, signature = null, gradu
     graduatedCoin?.marketCap,
     graduatedCoin?.usd_market_cap,
   );
+  // Jupiter reports a meaningless market cap for the first seconds after a
+  // migration (a token that graduated at 60k shows up as 59). When the number
+  // is missing or absurdly small, DexScreener is the second opinion.
+  const dexMarketCap = dexscreenerMarketCap(dexscreener);
+  const useDexScreener = Boolean(dexMarketCap) && (!Number.isFinite(baseMarketCapUsd) || baseMarketCapUsd < 1000);
+  const marketCapUsd = useDexScreener ? dexMarketCap : baseMarketCapUsd;
+  const priceUsd = useDexScreener && dexscreener?.priceUsd
+    ? dexscreener.priceUsd
+    : (basePriceUsd || dexscreener?.priceUsd || null);
   const signalRoute = route || [
     fee ? 'fee' : null,
     graduatedCoin ? 'graduated' : null,
@@ -163,7 +174,7 @@ export async function buildCandidate({ mint, fee = null, signature = null, gradu
     metrics: {
       priceUsd,
       marketCapUsd,
-      liquidityUsd: Number(gmgn?.liquidity ?? jupiterAsset?.liquidity ?? trendingToken?.liquidity ?? 0),
+      liquidityUsd: Number(gmgn?.liquidity ?? jupiterAsset?.liquidity ?? trendingToken?.liquidity ?? 0) || dexscreener?.liquidityUsd || 0,
       holderCount: Number(activity?.holders || gmgn?.holder_count || jupiterAsset?.holderCount || trendingToken?.holder_count || graduatedCoin?.numHolders || 0),
       gmgnTotalFeesSol: Number(gmgn?.total_fee ?? jupiterAsset?.fees ?? 0),
       gmgnTradeFeesSol: Number(gmgn?.trade_fee ?? 0),
@@ -196,6 +207,7 @@ export async function buildCandidate({ mint, fee = null, signature = null, gradu
     chart,
     rugcheck,
     activity,
+    dexscreener,
     savedWalletExposure,
     twitterNarrative,
     createdAtMs: now(),
