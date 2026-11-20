@@ -39,6 +39,18 @@ export function trendingSignalPass(row) {
 
 let keylessTrendingWarned = false;
 
+// Optional mint suffix allow-list. Empty (the default) keeps every launchpad,
+// because a real call can live on a non-pump mint: the MAIN call the operator
+// flagged ended with 'main' and was invisible while this was hardcoded.
+const mintSuffix = String(process.env.TRENDING_MINT_SUFFIX || '').trim();
+
+/** Empty suffix accepts every launchpad; a value restricts trending to it. */
+export function trendingMintAllowed(mint, suffix = mintSuffix) {
+  if (!mint) return false;
+  if (!suffix) return true;
+  return String(mint).endsWith(suffix);
+}
+
 export async function fetchJupiterTrendingRows(interval, limit) {
   const supported = new Set(['5m', '1h', '6h', '24h']);
   const window = supported.has(interval) ? interval : '5m';
@@ -101,7 +113,7 @@ export async function fetchGmgnTrending(intervalOverride = null) {
     let tracked = 0;
     for (const [index, row] of rows.entries()) {
       const mint = row?.address || row?.mint;
-      if (!mint || !String(mint).endsWith('pump') || !trendingSignalPass(row)) continue;
+      if (!trendingMintAllowed(mint) || !trendingSignalPass(row)) continue;
       const token = { ...row, address: mint, interval, rank: index + 1, seenAt };
       trending.set(mint, token);
       tracked += 1;
