@@ -35,7 +35,7 @@ export async function processCandidateFromSignals(signals) {
   // the flow; only execution stops. Skipping the build here used to hide every
   // new token for as long as the position cap was reached.
   if (!canOpenMorePositions()) {
-    const max = numSetting('max_open_positions', 3);
+    const max = Number(activeStrategy().max_open_positions ?? numSetting('max_open_positions', 3));
     console.log(`[candidate] stored, slots full (${openPositionCount()}/${max}) ${candidate.token.mint.slice(0, 8)}...`);
     return;
   }
