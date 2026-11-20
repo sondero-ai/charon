@@ -56,13 +56,13 @@ effort Telegram alert, exit non-zero so PM2 restarts cleanly), handles
    - **Server mode** — used whenever `SIGNAL_SERVER_URL` is set. Polls
      `/api/signals` every `SIGNAL_POLL_MS`, plus the dip-alert monitor when the
      strategy is `wait_for_dip`.
-   - **Standalone mode** — only when the signal URL is empty. Polls Pump.fun
-     graduated coins and Jupiter trending directly, opens the fee-claim
-     WebSocket, and subscribes to PumpPortal's migration feed
-     (`src/signals/migrationWatcher.js`). A migration is the standalone
-     equivalent of a "graduated" signal: it feeds the `graduated` map and
-     triggers a candidate, with one delayed re-check 90 s later because Jupiter's
-     asset index lags a fresh migration.
+   - **Standalone mode** — only when the signal URL is empty. Fills the graduated
+     map from GeckoTerminal's new-pools feed filtered to PumpSwap (a PumpSwap pool
+     only exists after a bonding curve graduates), polls Jupiter trending, opens
+     the fee-claim WebSocket, and subscribes to PumpPortal's migration feed
+     (`src/signals/migrationWatcher.js`). A migration triggers a candidate
+     immediately and once more 90 s later, because Jupiter's asset index lags a
+     fresh migration while GeckoTerminal already carries its fdv.
 6. Starts the position monitor loop and the six-hourly retention prune.
 
 ## Module map

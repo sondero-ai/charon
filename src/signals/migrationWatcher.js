@@ -70,7 +70,11 @@ async function handleMigration(message) {
   await dispatch(payload, 'immediate');
 
   setTimeout(() => {
-    dispatch({ ...payload, route: 'graduated_recheck', trendingToken: trending.get(mint) || null }, 'recheck')
+    // Re-read the map: the GeckoTerminal poller may have enriched this mint with
+    // fdv/liquidity by now, which is what lets the candidate pass the mcap filter
+    // even while Jupiter's index still lags.
+    const enriched = graduated.get(mint) || coin;
+    dispatch({ ...payload, graduatedCoin: enriched, route: 'graduated_recheck', trendingToken: trending.get(mint) || null }, 'recheck')
       .catch(() => {});
   }, RECHECK_MS).unref();
 }

@@ -49,6 +49,8 @@ alert, exit code 1.
 | `TRENDING_ENABLED`, `TRENDING_SOURCE`, `TRENDING_ALLOW_DEGEN`, `TRENDING_INTERVAL`, `TRENDING_LIMIT`, `TRENDING_ORDER_BY`, `TRENDING_MIN_VOLUME_USD`, `TRENDING_MIN_SWAPS`, `TRENDING_MAX_RUG_RATIO`, `TRENDING_MAX_BUNDLER_RATE` | see `.env.example` | Seed the `settings` table. |
 | `PUMPPORTAL_WS_URL` | `wss://pumpportal.fun/api/data` | Standalone migration feed (no key required). |
 | `MIGRATION_RECHECK_MS` | `90000` | Delayed re-check of a fresh migration, after Jupiter's index has priced it. |
+| `GRADUATED_SOURCE` | `geckoterminal` | `pumpfun` only works from an IP that clears pump.fun's Cloudflare challenge. GeckoTerminal's new-pools feed filtered to PumpSwap is the working default. |
+| `GRADUATED_GECKO_PAGES` | `2` | Pages of 20 new pools per poll; free tier allows 30 calls/min. |
 
 ### RPC and enrichment
 
