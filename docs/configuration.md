@@ -61,6 +61,10 @@ alert, exit code 1.
 | `GMGN_REQUEST_DELAY_MS` | `2500` | Do not go below 2500; the GMGN key gets banned. |
 | `GMGN_MAX_RETRIES` | `2` | Honours `Retry-After`. |
 | `GMGN_CACHE_TTL_MS` | `300000` | Token-info cache. |
+| `RUGCHECK_ENABLED` | `true` | Keyless risk data (rug history, LP lock, danger flags). A failed lookup means "unknown", never "safe". |
+| `RUGCHECK_TIMEOUT_MS` | `8000` | Per-request timeout. |
+| `RUGCHECK_CACHE_TTL_MS` | `300000` | Success cache. Failures are cached for `RUGCHECK_FAILURE_TTL_MS` (60 s). |
+| `RUGCHECK_REQUEST_DELAY_MS` | `1200` | Pacing between requests. |
 
 ### Execution
 
@@ -141,6 +145,10 @@ Four strategies ship seeded. Only `sniper` is enabled by default.
 | `trending_min_swaps` | 0 | 0 | 100 | 0 | 0 – 1e7 |
 | `trending_max_rug_ratio` | 0.3 | 0.3 | 0.2 | 0.5 | 0–1 |
 | `trending_max_bundler_rate` | 0.5 | 0.5 | 0.3 | 0.7 | 0–1 |
+| `max_rugcheck_score` | 0 | 0 | 0 | 0 | 0–100 (`0` = off) |
+| `rugcheck_max_dangers` | 0 | 0 | 0 | 0 | 0–50 (`0` = off) |
+| `min_lp_locked_pct` | 0 | 0 | 0 | 0 | 0–100 (`0` = off) |
+| `rugcheck_reject_rugged` | 0 | 0 | 0 | 0 | 0/1 (`0` = off) |
 | `position_size_sol` | 0.1 | 0.05 | 0.1 | 0.05 | 0.001 – `LIVE_MAX_POSITION_SOL` |
 | `max_open_positions` | 3 | 3 | 3 | 5 | 1–20 |
 | `tp_percent` | 50 | 30 | 100 | 30 | 1 – 10000 |

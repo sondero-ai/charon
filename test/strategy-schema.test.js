@@ -47,3 +47,12 @@ test('global settings share the same bounds', () => {
   assert.equal(normalizeNumericSetting('dry_run_buy_sol', '0').ok, false);
   assert.equal(STRATEGY_NUMERIC_KEYS.has('dry_run_buy_sol'), false);
 });
+
+test('rugcheck knobs are bounded and default to observe mode', () => {
+  assert.deepEqual(validateStrategySetting('max_rugcheck_score', 'off'), { ok: true, value: 0 });
+  assert.equal(validateStrategySetting('max_rugcheck_score', '150').ok, false);
+  assert.equal(validateStrategySetting('rugcheck_max_dangers', '2.5').ok, false);
+  assert.deepEqual(validateStrategySetting('rugcheck_reject_rugged', '1'), { ok: true, value: 1 });
+  assert.equal(validateStrategySetting('rugcheck_reject_rugged', '2').ok, false);
+  assert.equal(validateStrategySetting('min_lp_locked_pct', '-1').ok, false);
+});

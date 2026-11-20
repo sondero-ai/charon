@@ -4,6 +4,7 @@ import { fetchGmgnTokenInfo } from '../enrichment/gmgn.js';
 import { fetchJupiterAsset, fetchJupiterHolders, fetchJupiterChartContext } from '../enrichment/jupiter.js';
 import { fetchSavedWalletExposure } from '../enrichment/wallets.js';
 import { fetchTwitterNarrative } from '../enrichment/twitter.js';
+import { fetchRugcheckReport, rugcheckFailures } from '../enrichment/rugcheck.js';
 import { gmgnLink } from '../format.js';
 
 export function buildFeeSnapshot(fee, signature) {
@@ -112,6 +113,10 @@ export function filterCandidate(candidate) {
     }
   }
 
+  // Rugcheck risk gate. Every knob defaults to off, so this stays in observe
+  // mode (metrics stored in candidate_json) until an operator turns it on.
+  failures.push(...rugcheckFailures(strat, candidate.rugcheck));
+
   return { passed: failures.length === 0, failures, strategy: strat.id };
 }
 
@@ -121,6 +126,7 @@ export async function buildCandidate({ mint, fee = null, signature = null, gradu
   const jupiterAsset = await fetchJupiterAsset(mint);
   const holders = await fetchJupiterHolders(mint);
   const chart = await fetchJupiterChartContext(mint);
+  const rugcheck = await fetchRugcheckReport(mint);
   const savedWalletExposure = await fetchSavedWalletExposure(mint, holders);
   const twitterNarrative = await fetchTwitterNarrative(graduatedCoin || jupiterAsset, gmgn);
   const priceUsd = firstPositiveNumber(tokenPriceFromGmgn(gmgn), jupiterAsset?.usdPrice, trendingToken?.price);
@@ -182,6 +188,7 @@ export async function buildCandidate({ mint, fee = null, signature = null, gradu
     jupiterAsset,
     holders,
     chart,
+    rugcheck,
     savedWalletExposure,
     twitterNarrative,
     createdAtMs: now(),

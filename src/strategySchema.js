@@ -34,6 +34,10 @@ const RULES = {
   trending_min_swaps: { min: 0, max: 10_000_000, integer: true },
   trending_max_rug_ratio: { min: 0, max: 1 },
   trending_max_bundler_rate: { min: 0, max: 1 },
+  max_rugcheck_score: { min: 0, max: 100, off: 0 },
+  rugcheck_max_dangers: { min: 0, max: 50, integer: true, off: 0 },
+  min_lp_locked_pct: { min: 0, max: 100, off: 0 },
+  rugcheck_reject_rugged: { min: 0, max: 1, integer: true, off: 0 },
 
   // global settings reachable from /setfilter and the numeric input flow
   dry_run_buy_sol: { min: 0.001, max: MAX_POSITION_SOL },

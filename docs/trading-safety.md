@@ -40,6 +40,13 @@ In order:
    from Jupiter's `outAmount` estimate.
 9. **Bounded size** — `position_size_sol` is validated against
    `LIVE_MAX_POSITION_SOL` (default 5 SOL) before it is ever used.
+10. **Rugcheck risk data** — `src/enrichment/rugcheck.js` fetches the keyless
+    Rugcheck report for every candidate (score, danger flags, LP lock, rugged
+    flag) and stores it in `candidate_json`. The four strategy knobs
+    (`max_rugcheck_score`, `rugcheck_max_dangers`, `min_lp_locked_pct`,
+    `rugcheck_reject_rugged`) all default to `0`, which means observe-only: the
+    data is recorded and shown, but nothing is vetoed until an operator sets a
+    threshold. A failed Rugcheck lookup is `unknown`, never `safe`.
 
 ## Exit rules
 
